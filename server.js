@@ -13,11 +13,27 @@ app.post('/api/analyze', async (req, res) => {
     const { prompt, apiKey } = req.body;
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1000, tools: [{ type: 'web_search_20250305', name: 'web_search' }], messages: [{ role: 'user', content: prompt }] })
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'web-search-2025-03-05'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+        messages: [{ role: 'user', content: prompt }]
+      })
     });
-    res.json(await r.json());
-  } catch (e) { res.status(500).json({ error: e.message }); }
+    const data = await r.json();
+    // Log the full response for debugging
+    console.log('Anthropic response type:', r.status, JSON.stringify(data).slice(0, 200));
+    res.json(data);
+  } catch (e) {
+    console.error('analyze error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // Telegram
@@ -29,7 +45,7 @@ app.post('/api/telegram', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// BTC Price — Coinbase (US friendly, no restrictions)
+// BTC Price — Coinbase
 app.get('/api/btcprice', async (req, res) => {
   try {
     const [r1, r2] = await Promise.all([
@@ -44,7 +60,7 @@ app.get('/api/btcprice', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Klines — Kraken OHLC (US friendly)
+// Klines — Kraken
 app.get('/api/klines', async (req, res) => {
   try {
     const { interval, limit } = req.query;
@@ -55,7 +71,6 @@ app.get('/api/klines', async (req, res) => {
     const key = Object.keys(d.result).find(k => k !== 'last');
     const raw = d.result[key] || [];
     const lim = parseInt(limit) || 30;
-    // Convert Kraken [time,open,high,low,close,vwap,vol,count] to Binance-style array
     const klines = raw.slice(-lim).map(c => [+c[0]*1000, c[1], c[2], c[3], c[4], c[6]]);
     res.json(klines);
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -69,7 +84,7 @@ app.get('/api/feargreed', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Polymarket BTC 5-min market
+// Polymarket
 app.get('/api/market', async (req, res) => {
   try {
     const r = await fetch('https://gamma-api.polymarket.com/markets?active=true&closed=false&limit=100');
